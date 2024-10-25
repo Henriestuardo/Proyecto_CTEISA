@@ -1,221 +1,285 @@
 import tkinter as tk
+from tkinter import messagebox
 import random
+import time
 
-class MultiSubjectQuiz:
+class Cuestionario_multimateria:
+
+    # Funciones de Inicialización
     def __init__(self, master):
         self.master = master
-        master.title("Cuestionario")
-        master.geometry("400x600")
-        master.configure(bg="#f0f0f0")
+        master.title("Cuestionario")  
+        master.geometry("400x600")  
+        master.configure(bg="#f0f0f0")  # Color de fondo
+        master.protocol("WM_DELETE_WINDOW", self.on_closing)  # Manejo del cierre de ventana
 
-        self.score = 0
-        self.question_count = 0
-        self.questions = []
-        self.current_question = None
-        self.subject = ""
+        self.puntaje = 0  
+        self.contador_preguntas = 0  
+        self.preguntas = []  # Lista para almacenar preguntas
+        self.pregunta_actual = None  # Pregunta actual
+        self.subject = ""  # Tema seleccionado
+        self.hora_de_inicio = 0  
+        self.tiempo_total = 0  
+        self.cuestionario_en_progreso = False 
+        self.id_temporizador = None 
+        self.setup_ui()  # Configuración de la interfaz de usuario
 
-        self.subject_label = tk.Label(master, text="Selecciona un tema:", font=("Arial", 20, "bold"), bg="#f0f0f0")
-        self.subject_label.pack(pady=20)
+    def setup_ui(self):
+        self.clear_window()  # Limpiar la ventana antes de configurar
 
-        self.subject_var = tk.StringVar()
-        subjects = ["Matemáticas", "Lenguaje", "Ciencias Sociales"]
+
+        # Etiqueta para seleccionar un tema
+        self.etiqueta_seleccion = tk.Label(self.master, text="Selecciona un tema:", font=("Arial", 20, "bold"), bg="#f0f0f0")
+        self.etiqueta_seleccion.pack(pady=20)
+
+        self.sujeto_var = tk.StringVar()  # Variable para almacenar el tema seleccionado
+        self.sujeto_var.set(None)  # Establece el valor inicial
+        subjects = ["Matemáticas", "Lenguaje", "Ciencias Sociales"]  
         for subject in subjects:
-            tk.Radiobutton(master, text=subject, variable=self.subject_var, value=subject,
-            font=("Arial", 14), bg="#f0f0f0").pack(pady=5)
+            tk.Radiobutton(self.master, text=subject, variable=self.sujeto_var, value=subject,
+            font=("Arial", 14), bg="#f0f0f0").pack(pady=5)  # Botones de opción para los temas
 
-        self.start_button = tk.Button(master, text="Comenzar", command=self.start_quiz,
+
+        # Botón para comenzar el cuestionario
+        self.start_button = tk.Button(self.master, text="Comenzar", command=self.start_quiz,
         font=("Arial", 12), bg="#4CAF50", fg="white", relief="raised", width=12)
         self.start_button.pack(pady=15)
 
-        self.question_label = tk.Label(master, text="", font=("Arial", 16, "italic"), bg="#f0f0f0")
-        self.question_label.pack(pady=20)
 
-        self.answer_entry = tk.Entry(master, font=("Arial", 14), justify="center")
-        self.answer_entry.pack(pady=10)
-        self.answer_entry.pack_forget()
+        # Elementos de la interfaz para el cuestionario
+        self.etiqueta_pregunta = tk.Label(self.master, text="", font=("Arial", 16, "italic"), bg="#f0f0f0", wraplength=380)
+        self.etiqueta_temporizador = tk.Label(self.master, text="", font=("Arial", 14), bg="#f0f0f0")
+        self.entrada_de_respuesta = tk.Entry(self.master, font=("Arial", 14), justify="center")
 
-        self.send_button = tk.Button(master, text="Enviar respuesta", command=self.check_answer,
+
+        # Botón para enviar respuesta
+        self.boton_enviar = tk.Button(self.master, text="Enviar respuesta", command=self.comprobar_respuests,
         font=("Arial", 12), bg="#FFEB3B", relief="raised", width=12)
-        self.send_button.pack(pady=10)
-        self.send_button.pack_forget()
 
-        self.result_label = tk.Label(master, text="", font=("Arial", 14), bg="#f0f0f0")
-        self.result_label.pack(pady=10)
 
-        self.score_label = tk.Label(master, text="Puntaje: 0", font=("Arial", 14), bg="#f0f0f0")
-        self.score_label.pack(pady=10)
+        # Etiquetas para mostrar resultados y puntaje
+        self.resultado_actual = tk.Label(self.master, text="", font=("Arial", 14), bg="#f0f0f0", wraplength=380)
+        self.etiqueta_puntuación = tk.Label(self.master, text="Puntaje: 0", font=("Arial", 14), bg="#f0f0f0")
 
-        self.finish_button = tk.Button(master, text="Finalizar", command=self.finish_quiz,
+
+        # Botones para finalizar y regresar a la selección de temas
+        self.boton_terminar = tk.Button(self.master, text="Finalizar", command=self.finish_quiz,
         font=("Arial", 12), bg="#FF9800", fg="white", relief="raised", width=12)
-        self.finish_button.pack(pady=15)
-        self.finish_button.pack_forget()
 
-        self.back_button = tk.Button(master, text="Regresar a temas", command=self.reset_quiz,
+        self.boton_regresar = tk.Button(self.master, text="Regresar a temas", command=self.reset_quiz,
         font=("Arial", 12), bg="#FF9800", fg="white", relief="raised", width=12)
-        self.back_button.pack(pady=15)
-        self.back_button.pack_forget()
 
-        master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    def on_closing(self):
-        if self.score >= 7:
-            self.master.quit()
-        else:
-            self.result_label.config(text="Debes obtener al menos 7 puntos para salir.")
+    def clear_window(self):
+        # Limpiar todos los widgets de la ventana
+        for widget in self.master.winfo_children():
+            widget.pack_forget()
+
 
     def start_quiz(self):
-        self.subject = self.subject_var.get()
+        # Comenzar el cuestionario
+        self.subject = self.sujeto_var.get()  # Obtener tema seleccionado
         if self.subject:
-            self.generate_questions()
-            self.next_question()
+            self.clear_window()  
+            self.cuestionario_en_progreso = True  # Inicia el cuestionario
+            self.puntaje = 0  # Reiniciar puntaje
+            self.contador_preguntas = 0  
+            self.tiempo_total = 0  
+            self.preguntas.clear()  # Limpiar lista de preguntas
+            self.generate_preguntas()  # Generar preguntas según el tema
+            
 
-            self.start_button.pack_forget()
-            self.subject_label.pack_forget()
-            for widget in self.master.winfo_children():
-                if isinstance(widget, tk.Radiobutton):
-                    widget.pack_forget()
-
-            self.answer_entry.pack()
-            self.send_button.pack()
-            self.back_button.pack()
-            self.finish_button.pack()
-
+            # Mostrar elementos de la interfaz
+            self.etiqueta_pregunta.pack(pady=20)
+            self.etiqueta_temporizador.pack(pady=5)
+            self.entrada_de_respuesta.pack(pady=10)
+            self.boton_enviar.pack(pady=10)
+            self.resultado_actual.pack(pady=10)
+            self.etiqueta_puntuación.pack(pady=10)
+            self.boton_terminar.pack(pady=15)
+            self.boton_regresar.pack(pady=15)
+            
+            self.next_question() 
         else:
-            self.result_label.config(text="Por favor, selecciona un tema.")
+            messagebox.showinfo("Error", "Por favor, selecciona un tema.") 
 
-    def generate_questions(self):
+    def generate_preguntas(self):
+        # Generar preguntas según el tema seleccionado
         if self.subject == "Matemáticas":
-            self.generate_math_questions()
+            self.generate_math_preguntas()
         elif self.subject == "Lenguaje":
-            self.generate_language_questions()
+            self.generate_language_preguntas()
         elif self.subject == "Ciencias Sociales":
-            self.generate_social_science_questions()
+            self.generate_social_science_preguntas()
 
-
-
-    def generate_math_questions(self):
-        operations = ['+', '-', '*', '/']
-        for _ in range(16):  # 16 preguntas en total
-            op = random.choice(operations)
-            num1 = random.randint(1, 10)  # Limitar a 1-10 para simplificar
-            num2 = random.randint(1, 16)
-
-            if op == '-':
-                num1 = max(num1, num2)
-            elif op == '/':
-                # Asegura que la división sea simple
-                num1 = num1 * num2  # Asegura que la división sea exacta
-                num2 = random.randint(1, 10)  # Mantener divisor pequeño
-
+    def generate_math_preguntas(self):
+        # Generar preguntas de matemáticas
+        operations = ['+', '-', '*', '/']  
+        for _ in range(16):
+            op = random.choice(operations)  
             if op == '/':
+                num2 = random.randint(1, 10)  # Asegurarse de que num1 sea divisible por num2
+                num1 = num2 * random.randint(1, 10)
                 result = num1 // num2  # División entera
             else:
-                result = self.calculate(num1, num2, op)
-
-            self.questions.append((f"{num1} {op} {num2} = ?", str(result)))
+                num1 = random.randint(1, 10)  # Números aleatorios
+                num2 = random.randint(1, 10)
+                result = self.calculate(num1, num2, op)  
+            self.preguntas.append((f"{num1} {op} {num2} = ?", str(result)))  # Agregar pregunta a la lista
 
     def calculate(self, num1, num2, op):
-        if op == '+':
-            return num1 + num2
-        elif op == '-':
-            return num1 - num2
-        elif op == '*':
-            return num1 * num2
-        
+        # Calcular el resultado de la operación
+        if op == '+': return num1 + num2
+        elif op == '-': return num1 - num2
+        elif op == '*': return num1 * num2
 
-
-    def generate_language_questions(self):
-        questions = [
-            ("¿Cuál es el plural de 'lápiz'?", "lápices"),
-            ("¿Cuál es el antónimo de 'alegre'?", "triste"),
-            ("¿Qué tipo de palabra es 'rápidamente'?", "adverbio"),
-            ("¿Cuál es el pretérito perfecto simple de 'andar'?", "anduve"),
-            ("¿Cuál es el complemento directo en 'Juan lee un libro'?", "un libro"),
-            ("¿Qué figura literaria es 'El viento susurra'?", "personificación"),
-            ("¿Cuál es el superlativo de 'bueno'?", "óptimo"),
-            ("¿Qué tipo de oración es 'Ojalá llueva mañana'?", "desiderativa"),
-            ("¿Cuál es el gerundio de 'decir'?", "diciendo"),
-            ("¿Qué es un palíndromo?", "palabra que se lee igual al revés"),
-            ("¿Cuál es el participio de 'romper'?", "roto"),
-            ("¿Qué es una onomatopeya?", "palabra que imita un sonido"),
-            ("¿Cuál es el aumentativo de 'perro'?", "perrazo"),
-            ("¿Qué tipo de palabra es 'aunque'?", "conjunción"),
-            ("¿Cuál es el modo verbal en 'Quizás venga mañana'?", "subjuntivo"),
-            ("¿Qué es un sinónimo de 'efímero'?", "fugaz")
+    def generate_language_preguntas(self):
+        # Generar preguntas de lenguaje
+        preguntas = [
+            ("¿Qué es un sustantivo?", "palabra que nombra personas, animales, cosas o lugares"),
+            ("Escribe tres ejemplos de palabras que sean adjetivos.", "bonito, alto, grande"),
+            ("¿Qué signos utilizamos para hacer una pregunta?", "signos de interrogación ¿?"),
+            ("¿Qué es un verbo?", "palabra que indica una acción"),
+            ("¿Cuál es el plural de 'flor'?", "flores"),
+            ("Escribe el antónimo de 'grande'.", "pequeño"),
+            ("¿Qué es una oración?", "conjunto de palabras que expresan una idea completa"),
+            ("¿Qué palabra usamos para describir cómo sucede una acción?", "adverbio"),
+            ("¿Cuál es el diminutivo de 'perro'?", "perrito"),
+            ("¿Qué es un adjetivo?", "palabra que describe al sustantivo"),
+            ("Escribe tres ejemplos de pronombres.", "yo, tú, él"),
+            ("¿Qué signos utilizamos para hacer una exclamación?", "signos de exclamación ¡!"),
+            ("¿Qué es un sinónimo?", "palabra que tiene un significado similar a otra"),
+            ("¿Qué es un antónimo?", "palabra que tiene un significado opuesto a otra"),
+            ("¿Qué es un sujeto en una oración?", "la persona, animal o cosa de la que se habla en la oración"),
+            ("Escribe un ejemplo de una oración interrogativa.", "¿Cómo te llamas?")
         ]
-        self.questions = random.sample(questions, min(len(questions), 16))
+        self.preguntas = random.sample(preguntas, 16) 
 
-    def generate_social_science_questions(self):
-        questions = [
-            ("¿En qué año se descubrió América?", "1492"),
-            ("¿Cuál es la capital de Francia?", "París"),
-            ("¿Quién pintó 'La noche estrellada'?", "Van Gogh"),
-            ("¿En qué continente está Egipto?", "África"),
-            ("¿Cuál es el río más largo del mundo?", "Amazonas"),
-            ("¿Quién fue el primer presidente de Estados Unidos?", "George Washington"),
-            ("¿En qué año comenzó la Primera Guerra Mundial?", "1914"),
-            ("¿Cuál es la montaña más alta del mundo?", "Everest"),
-            ("¿Quién escribió 'Cien años de soledad'?", "Gabriel García Márquez"),
-            ("¿Cuál es el océano más grande?", "Pacífico"),
-            ("¿En qué año cayó el Muro de Berlín?", "1989"),
-            ("¿Cuál es el país más poblado del mundo?", "China"),
-            ("¿Quién fue el líder de los derechos civiles en EE.UU.?", "Martin Luther King Jr."),
-            ("¿Cuál es la moneda de Japón?", "Yen"),
-            ("¿En qué año terminó la Segunda Guerra Mundial?", "1945"),
-            ("¿Quién pintó la Mona Lisa?", "Leonardo da Vinci")
+    def generate_social_science_preguntas(self):
+        # Generar preguntas de ciencias sociales
+        preguntas = [
+            ("¿Qué es una comunidad?", "grupo de personas que viven en un mismo lugar y comparten cosas en común"),
+            ("Nombra tres servicios que ofrece tu comunidad.", "escuela, hospital, parque"),
+            ("¿Qué es un mapa?", "una representación de un lugar"),
+            ("¿Cuáles son los nombres de los puntos cardinales?", "norte, sur, este, oeste"),
+            ("¿Qué es una familia?", "grupo de personas unidas por lazos de sangre o convivencia"),
+            ("¿Qué es una tradición?", "una costumbre que se pasa de generación en generación"),
+            ("¿Qué es un país?", "un territorio con fronteras y un gobierno propio"),
+            ("Nombra dos medios de transporte en tu comunidad.", "autobús, bicicleta"),
+            ("¿Quién es el alcalde?", "la persona que dirige la ciudad o comunidad"),
+            ("Nombra dos tipos de paisajes naturales.", "montañas, ríos"),
+            ("¿Qué es una frontera?", "una línea que separa territorios o países"),
+            ("¿Qué es una ciudad?", "un lugar donde viven muchas personas con servicios y edificios"),
+            ("¿Qué colores tiene la bandera de tu país?", "depende del país, por ejemplo, azul y blanco para Guatemala"),
+            ("Nombra dos continentes.", "América, Europa"),
+            ("¿Qué es un lago?", "una gran extensión de agua rodeada de tierra"),
+            ("¿Qué es una capital?", "la ciudad más importante de un país o región donde se encuentra el gobierno")
         ]
-        self.questions = random.sample(questions, min(len(questions), 16))
+        self.preguntas = random.sample(preguntas, 16)  
+
 
     def next_question(self):
-        if self.question_count < len(self.questions):
-            self.current_question = self.questions[self.question_count]
-            self.question_label.config(text=self.current_question[0])
-            self.answer_entry.delete(0, tk.END)
+        # Mostrar la siguiente pregunta
+        if self.contador_preguntas < len(self.preguntas):
+            self.pregunta_actual = self.preguntas[self.contador_preguntas]  # Obtener la pregunta actual
+            self.etiqueta_pregunta.config(text=self.pregunta_actual[0])  # Mostrar la pregunta
+            self.entrada_de_respuesta.delete(0, tk.END)  # Limpiar entrada de respuesta
+            self.hora_de_inicio = time.time()  # Reiniciar el temporizador
+            self.update_timer()  # Actualizar el temporizador
         else:
-            self.finish_quiz()
+            self.show_final_results()  # Mostrar resultados finales
 
-    def check_answer(self):
-        check_answer = self.answer_entry.get().strip().lower()
-        correct_answer = self.current_question[1].lower()
 
-        if check_answer == correct_answer:
-            self.result_label.config(text="¡Correcto!", fg="green")
-            self.score += 1
+    def update_timer(self):
+        # Actualizar el temporizador
+        if self.cuestionario_en_progreso:
+            tiempo_transcurrido = int(time.time() - self.hora_de_inicio)  # Calcular tiempo transcurrido
+            tiempo_restante = max(0, 20 - tiempo_transcurrido)  # Calcular tiempo restante
+            self.etiqueta_temporizador.config(text=f"Tiempo restante: {tiempo_restante} segundos")  # Mostrar tiempo restante
+            if tiempo_restante > 0:
+                self.id_temporizador = self.master.after(1000, self.update_timer)  # Actualizar cada segundo
+            else:
+                self.comprobar_respuests()  # Comprobar respuesta si se acaba el tiempo
+
+
+    def comprobar_respuests(self):
+        # Comprobar la respuesta del usuario
+        if self.cuestionario_en_progreso:
+            if self.id_temporizador:
+                self.master.after_cancel(self.id_temporizador)  
+            tiempo_transcurrido = int(time.time() - self.hora_de_inicio)  
+            self.tiempo_total += tiempo_transcurrido  # Sumar al tiempo total
+
+            comprobar_respuests = self.entrada_de_respuesta.get().strip().lower()  # Obtener respuesta del usuario
+            respuesta_correcta = self.pregunta_actual[1].lower()  # Obtener respuesta correcta
+
+
+            # Comparar respuestas y actualizar puntaje
+            if comprobar_respuests == respuesta_correcta:
+                self.resultado_actual.config(text="¡Correcto!", fg="green")  # Mensaje de respuesta correcta
+                self.puntaje += 1  # Incrementar puntaje
+            else:
+                self.resultado_actual.config(text=f"Incorrecto. La respuesta correcta era: {self.pregunta_actual[1]}", fg="red")  
+
+            self.contador_preguntas += 1  # Incrementar contador de preguntas
+            self.update_etiqueta_puntuación()  
+            self.next_question()  
+
+
+    def update_etiqueta_puntuación(self):
+        # Actualizar etiqueta de puntaje
+        self.etiqueta_puntuación.config(text=f"Puntaje: {self.puntaje}")
+
+
+    def show_final_results(self):
+        # Mostrar resultados finales al terminar el cuestionario
+        self.cuestionario_en_progreso = False  # Cambiar estado del cuestionario
+        minutes, seconds = divmod(self.tiempo_total, 60)  # Calcular minutos y segundos
+        messagebox.showinfo("Resultados Finales", 
+                            f"¡Felicidades!\nTu puntaje final es: {self.puntaje}\n"
+                            f"Tiempo total: {minutes} minutos y {seconds} segundos")  # Mostrar resultados
+        if self.puntaje < 7:
+            self.reset_quiz()  # Reiniciar cuestionario si el puntaje es bajo
         else:
-            self.result_label.config(text=f"Incorrecto. La respuesta correcta era: {self.current_question[1]}", fg="red")
+            self.boton_terminar.config(state=tk.NORMAL)  # Habilita el botón de finalizar
 
-        self.question_count += 1
-        self.update_score_label()
-        self.next_question()
-
-    def update_score_label(self):
-        self.score_label.config(text=f"Puntaje: {self.score}")
 
     def finish_quiz(self):
-        if self.score >= 7:
-            self.result_label.config(text=f"¡Felicidades! Puntaje final: {self.score}. Puedes salir del juego.", fg="blue")
-            self.master.quit()  # Cierra la ventana si el puntaje es 7 o más
+        # Finalizar el cuestionario
+        if self.puntaje >= 7:
+            minutes, seconds = divmod(self.tiempo_total, 60)  # Calcular minutos y segundos
+            messagebox.showinfo("Resumen Final", 
+                                f"Tu puntaje final es: {self.puntaje}\n"
+                                f"Tiempo total: {minutes} minutos y {seconds} segundos")  # Mostrar resumen final
+            self.master.quit()  # Cerrar la aplicación
         else:
-            self.result_label.config(text=f"Puntaje final: {self.score}. Necesitas 7 puntos para salir. Intenta de nuevo.", fg="orange")
-        self.reset_quiz()
+            messagebox.showinfo("No se puede finalizar", 
+                                "Debes obtener al menos 7 puntos para finalizar el juego.") 
+            
 
     def reset_quiz(self):
-        self.score = 0
-        self.question_count = 0
-        self.questions.clear()
-        self.subject_var.set("")
+        # Reiniciar el cuestionario
+        self.cuestionario_en_progreso = False  # Cambiar estado del cuestionario
+        self.puntaje = 0 
+        self.contador_preguntas = 0 
+        self.preguntas.clear()  
+        self.sujeto_var.set("")  
+        self.tiempo_total = 0 
+        if self.id_temporizador:
+            self.master.after_cancel(self.id_temporizador)  # Cancelar temporizador si está activo
+        self.setup_ui()  # Configurar interfaz de usuario
 
-        # Reinicia la interfaz
-        self.subject_label.pack()
-        self.start_button.pack()
-        for widget in self.master.winfo_children():
-            if isinstance(widget, tk.Radiobutton):
-                widget.pack_forget()
 
-        self.result_label.config(text="")
-        self.score_label.config(text="Puntaje: 0")
+    def on_closing(self):
+        # Manejar el cierre de la ventana
+        if self.cuestionario_en_progreso:
+            messagebox.showinfo("No se puede salir", 
+                                "Debes obtener al menos 7 puntos y presionar 'Finalizar' para salir del juego.")
+        else:
+            self.master.quit()  # Cerrar la aplicación
+
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = MultiSubjectQuiz(root)
-    root.mainloop()
+    root = tk.Tk()  # Crea la instancia de la ventana principal
+    quiz_app = Cuestionario_multimateria(root)  # Crea el objeto del cuestionario
+    root.mainloop()  # Inicia mi bucle principal de la interfaz
